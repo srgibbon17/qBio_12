@@ -1,0 +1,139 @@
+---
+title: "Stats_data_rich"
+output: html_document
+date: "2026-09-14"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Review of Hypothesis Testing
+
+Null - the default state of the system which we are testing; denoted $H_0$
+
+Alternative - not the null; denoted $H_1$
+
+Significance level - defines threshold for Type I errors; denoted $\alpha$ 
+
+p-value - probability of obtaining a result as extreme as or more extreme than the data under the null; $\mathbb{P}(\text{data as or more extreme } | H_0 )$
+
+```{r}
+# set a random seed for reproducibility
+set.seed(222)
+p <- 0.5 # prob. of head for fair coin
+flips <- 1000
+data <- sample(c('H', 'T'), 
+               flips, prob = c(p, 1-p), 
+               replace = TRUE)
+heads <- sum(data == 'H')
+
+# or, for a faster vectorized version
+heads <- rbinom(1, flips, p)
+
+# compute a one sided p-value 
+one.sided.pvalue <- 1 - pbinom(heads, flips, 0.5)
+print(one.sided.pvalue)
+
+# and compare to a two sided p-value
+heads <- rbinom(1, flips, p)
+two.sided.pvalue <- binom.test(heads, flips, 0.5, alternative = 'two.sided')
+print(two.sided.pvalue)
+
+# plot a distribution of flips
+heads_dist <- rbinom(1000, flips, p)
+hist(heads_dist, main='distribution number heads', xlab='number of heads')
+```
+
+```{r}
+# function to compute the distribution of p-values
+plot_pvalue_dist <- function(num_coins, flips, p){
+  heads <- rbinom(num_coins, flips, p)
+  pvalues <- 1-pbinom(heads, flips, 0.5)
+  hist(pvalues, xlab='p-value', freq = FALSE)
+  abline(h=1, col='red', main = paste0('p = ', p), lty=2)
+}
+# simulate
+num_coins <- 25000
+plot_pvalue_dist(num_coins, flips, p)
+
+# compare that to a biased coin
+p <- 0.52
+plot_pvalue_dist(num_coins, flips, p)
+
+p <- 0.55
+plot_pvalue_dist(num_coins, flips, p)
+
+
+```
+
+## p-hacking
+
+- Data trimming (excluding outliers)
+- Picking different variables and fishing for significance
+- Data transformation
+- Stopping data collection early
+- Hypothesis switching
+- Data mining
+- Selecting test statistics ('p-value shopping')
+- Overfitting (fitting complex models with additional parameters until significance is achieved... e.g. adding regressors to a multiple regression until the coefficient for a given variable is significant)
+
+### Type I and II Errors
+
+- Type I - false positive; test is significant and $H_0$ is true; controlled by $\alpha$
+- Type II - false negative; test is not significant and $H_0$ is false; sensitive to power and sample size
+
+### Distribution of p-values
+- Uniform if the null is true; plot with histogram or Q-Q plot
+
+## Multiple Testing
+- Let S denote true positives, V denote false positives (Type I errors), T denote false negatives (Type II errors), and U denote true negatives
+
+- FWER $ = 1 - \mathbb{P}(V = 0) = \mathbb{P}(V \geq 1) = 1 - (1- \alpha)^{n}$ where $n$ is the number of tests; probability of at least one Type I error occurring
+
+- FDR = $\mathbb{E}[V / (V+S)]$ is the expected proportion of positive tests which are false; most often we will define a new significance level $\alpha^* < \alpha$ s.t. $FDR < \alpha$ where $\alpha$ is the original or desired significance level
+
+- Bonferroni Correction - adjust p-values by the number of tests ($n$); concretely, we set $p_i^* = \min(p_i*n, 1)$
+
+- Benjamini-Hochberg Correction - order the p-values and set $p_i = \min(\frac{i*p_i}{n}, 1)$ and reject up to $p_i < \alpha$; equivalently, find the smallest $i$ s.t. $\frac{i*p_i}{n} < \alpha$
+
+```{r}
+toss_coins <- function(num_flips, p){
+  heads <- rbinom(1, num_flips, p)
+  pvalue <- 1 - pbinom(heads, num_flips, 0.5)
+  if (p == 0.5){
+    return(data.frame(p=p, heads=heads, pval=pvalue, H0=TRUE))
+  } else {
+    return(data.frame(p=p, heads=heads, pval=pvalue, H0=FALSE))
+  }
+}
+
+set.seed(8)
+data <- data.frame()
+# biased samples
+for (i in 1:50) data <- rbind(data, toss_coins(1000, 0.55))
+# unbiased samples
+for (i in 1:50) data <- rbind(data, toss_coins(1000, 0.5))
+head(data)
+
+library(dplyr)
+data <- arrange(data, pval)
+head(data)
+```
+
+## Regression and Model Selection
+
+### Linear Regression
+
+- Model - $\hat{Y} = mX + b + \epsilon$ and $Y$ is the observed data; to find the OLS solution, we solve $\arg \min_{m, b} (\hat{Y} - Y)^2$
+
+- $R^2 = \text{var}(\hat{Y}) / \text{var}(Y)$ 
+
+### Logistic Regression
+
+- Model - $Y \in \{0, 1\}$ (this could be disease state or some other discrete RV)
+- Convert $Y$ to continuous... consider the probability of a disease, $\mathbb{P}(\text{disease}) \in [0,1]$ and then take the odds ratio, $OR = \frac{\mathbb{P}(\text{disease})}{1-\mathbb{P}(\text{disease})} \in [0, \infty)$ and finally compute the logarithm (i.e., the logit function) as $\log(OR) \in (-\infty, \infty)$
+
+### AIC and BIC
+
+### Cross Validation

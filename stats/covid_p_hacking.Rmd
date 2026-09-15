@@ -1,0 +1,54 @@
+---
+title: "COVID p-hacking"
+author: "Xenopus laevis Team - Go Frogs, Go!"
+output: html_document
+date: "2026-09-14"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message=FALSE}
+
+library(dplyr)
+# read the data sheet into “R”. The dataset will be called "data".
+data <- read.csv("https://catalog.ourworldindata.org/garden/covid/latest/compact/compact.csv",
+     na.strings = "",header=T)
+
+# get a subset of the data for just the Winter Olympics hosted in Beijing
+winter_olympics <- data %>%
+  filter(country == 'Winter Olympics 2022') %>%
+  select(c(date, reproduction_rate))
+
+colnames(winter_olympics) <- c('date', 'reproduction_rate_olympics')
+
+# get a subset of the data from China, where the games were hosted
+china <- data %>%
+  filter(country == 'China')
+
+# combine the dfs together
+combined_df <- left_join(winter_olympics, china, by = 'date')
+
+# a list of column names/predictors to loop through
+predictors <- c('total_cases', 'new_cases', 'new_cases_smoothed', 'total_cases_per_million', 'new_cases_per_million', 'new_cases_smoothed_per_million', 'total_deaths', 'new_deaths', 'new_deaths_smoothed', 'total_deaths_per_million', 'new_deaths_per_million', 'new_deaths_smoothed_per_million', 'new_tests_smoothed', 'new_tests_smoothed_per_thousand', 'positive_rate', 'tests_per_case', 'new_vaccinations', 'new_vaccinations_smoothed')
+
+# define a data frame to store our results
+res <- data.frame()
+
+olympic_rr <- combined_df$reproduction_rate_olympics
+for (predictor in predictors){
+  pred_data <- combined_df[predictor]
+  est <- cor.test(olympic_rr, pred_data[,1])$estimate
+  p_val <- cor.test(olympic_rr, pred_data[,1])$p.value
+  res <- rbind(res, c(predictor, est, p_val))
+}
+colnames(res) <- c('predictor', 'estimated correlation', 'p-value')
+
+# then, looking at res, it is clear that new_vaccinations are positively correlated with the reproduction rate... and we'll just ignore all the other results, significant or not
+# so, let's print that result
+vaccination_correlation_results <- filter(res, predictor == 'new_vaccinations')
+vaccination_correlation_results
+```
+
+Our study into the COVID-19 reproduction rate at the Beijing 2022 Winter Olympics and new vaccinations in China from January 27th, 2022 to January 2nd, 2023 clearly indicates that, contrary to popular belief, new vaccinations are significantly associated with an increase in COVID-19 reproduction rate (r = 0.409, p = 3.3e-15). We attribute this observation to the fact that Olympic athletes are genetic anomalies whose genomes may have had an adverse reaction with the viral vaccine, causing an increase in viral reproduction upon vaccination.
