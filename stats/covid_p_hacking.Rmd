@@ -1,8 +1,10 @@
 ---
 title: "COVID p-hacking"
 author: "Xenopus laevis Team - Go Frogs, Go!"
-output: html_document
 date: "2026-09-14"
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
